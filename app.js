@@ -141,7 +141,7 @@ const rReqIconFleetNumbers = new Set([
   "9201",
 ]);
 
-const kReqIconFleetNumbers = new Set(["35", "94", "229", "1110"]);
+const kReqIconFleetNumbers = new Set(["229"]);
 
 const bothReqIconFleetNumbers = new Set([
   "22",
