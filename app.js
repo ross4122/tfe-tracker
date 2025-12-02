@@ -135,7 +135,6 @@ const bothReqIconFleetNumbers = new Set([
   "767",
   "770",
   "772",
-  "773",
   "774",
   "777",
   "779",
