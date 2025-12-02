@@ -99,7 +99,6 @@ const rReqIconFleetNumbers = new Set([
   "430",
   "457",
   "560",
-  "570",
   "700",
   "930",
   "934",
