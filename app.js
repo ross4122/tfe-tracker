@@ -213,70 +213,59 @@ function filterVehicles(vehicle) {
   );
 }
 
-// Function to fetch and display vehicle locations
+// Function to fetch and display vehicle locations from the NEW Lothian API
 async function fetchVehicleData() {
   try {
-    const response = await fetch(
-      "https://tfe-opendata.com/api/v1/vehicle_locations"
-    );
+    const response = await fetch("https://lothianapi.com/vehicles/all");
     const data = await response.json();
 
-    // Check if a popup is open before updating markers
+    // Track popup state before marker updates
     popupWasOpen = !!map._popup;
 
     if (!data.vehicles) return;
 
-    // Check if "Requirements" checkbox is ticked
-    const showRequirementsOnly = document.getElementById(
-      "requirementsCheckbox"
-    ).checked;
+    const showRequirementsOnly =
+      document.getElementById("requirementsCheckbox").checked;
 
-    // Remove vehicles that should no longer be shown
+    // Remove markers that no longer qualify under requirement filter
     if (showRequirementsOnly) {
-      // Loop through all markers and remove those that don't meet the requirement
       vehicleMarkers.forEach((marker, fleet_number) => {
         if (
           !rReqIconFleetNumbers.has(fleet_number) &&
           !kReqIconFleetNumbers.has(fleet_number) &&
           !bothReqIconFleetNumbers.has(fleet_number)
         ) {
-          marker.remove(); // Remove the marker from the map
-          vehicleMarkers.delete(fleet_number); // Remove the marker from the map's tracking list
+          marker.remove();
+          vehicleMarkers.delete(fleet_number);
         }
       });
     }
 
     data.vehicles.forEach((vehicle) => {
-      if (!vehicle.latitude || !vehicle.longitude) return;
+      if (!vehicle.coordinate) return;
 
-      const fleet_number = vehicle.vehicle_id; // Fleet number
-      const lat = vehicle.latitude;
-      const lon = vehicle.longitude;
-      const line = vehicle.service_name || ""; // Service number (empty if not available)
-      const destination = vehicle.destination || ""; // Destination (empty if not available)
-      let lastFixSecs = vehicle.last_gps_fix_secs || 0; // Time since last GPS fix
+      const fleet_number = vehicle.vehicleID || vehicle.id;
 
-      // Adjust last_gps_fix_secs based on the source
-      if (vehicle.source === "MyBusTracker" && lastFixSecs > 3600) {
-        lastFixSecs -= 3600; // Subtract 1 hour (3600 seconds) if from MyBusTracker and last_gps_fix_secs > 3600
+      const lat = vehicle.coordinate.latitude;
+      const lon = vehicle.coordinate.longitude;
+
+      const line = vehicle.routeName || "";
+      const destination = vehicle.destination || "";
+
+      // IMPORTANT: new API uses lastUpdated (ISO string)
+      const lastUpdatedIso = vehicle.lastUpdated;
+
+      let secondsAgo = 0;
+      if (lastUpdatedIso) {
+        const updatedDate = new Date(lastUpdatedIso);
+        const now = new Date();
+        secondsAgo = Math.floor((now - updatedDate) / 1000);
       }
 
-      // Convert last_gps_fix to a timestamp (in seconds)
-      const lastGpsFixTimestamp = vehicle.last_gps_fix;
+      // Skip vehicles with timestamps older than 15 minutes
+      if (secondsAgo > 900) return;
 
-      // Calculate the time difference from the current time (in seconds)
-      const currentTime = Math.floor(Date.now() / 1000); // Get current time in seconds
-      const timeSinceLastFix = currentTime - lastGpsFixTimestamp; // Time in seconds
-
-      // Only show vehicles with data from the last 15 minutes (900 seconds)
-      if (timeSinceLastFix > 900) {
-        console.log(
-          `Skipping vehicle ${fleet_number} due to old data (last fix: ${timeSinceLastFix} seconds ago)`
-        );
-        return; // Skip rendering this vehicle
-      }
-
-      // If "Requirements" checkbox is ticked, filter based on fleet number lists
+      // Requirements-only filter
       if (
         showRequirementsOnly &&
         !(
@@ -285,34 +274,28 @@ async function fetchVehicleData() {
           bothReqIconFleetNumbers.has(fleet_number)
         )
       ) {
-        return; // Skip this vehicle if it's not in the required lists
+        return;
       }
 
-      // Format "last seen" time
-      let timeAgo;
-      if (lastFixSecs < 60) {
-        timeAgo = `${lastFixSecs} seconds ago`;
-      } else if (lastFixSecs < 120) {
+      // Format "x seconds/minutes ago"
+      let timeAgo = "";
+      if (!lastUpdatedIso) {
+        timeAgo = "No timestamp";
+      } else if (secondsAgo < 60) {
+        timeAgo = `${secondsAgo} seconds ago`;
+      } else if (secondsAgo < 120) {
         timeAgo = "1 minute ago";
       } else {
-        timeAgo = `${Math.floor(lastFixSecs / 60)} minutes ago`;
+        timeAgo = `${Math.floor(secondsAgo / 60)} minutes ago`;
       }
 
-      // Convert timestamp to a human-readable date format
-      const lastSeenDate = new Date(lastGpsFixTimestamp * 1000); // Convert timestamp from seconds to milliseconds
-      const lastSeenTime = lastSeenDate.toLocaleString(); // Format it as a locale-specific string
-
-      // Determine what to display for line and destination in the popup
+      // Popup formatting
       let popupText = "";
-      if (line && destination) {
-        popupText = `<b>${line}</b> to <b>${destination}</b>`;
-      } else if (line && !destination) {
-        popupText = `<b>${line}</b>`;
-      } else if (!line && !destination) {
-        popupText = "Not in Service";
-      }
+      if (line && destination) popupText = `<b>${line}</b> to <b>${destination}</b>`;
+      else if (line) popupText = `<b>${line}</b>`;
+      else popupText = "Not in Service";
 
-      // Check if the marker already exists
+      // Update or create marker
       if (vehicleMarkers.has(fleet_number)) {
         vehicleMarkers.get(fleet_number).setLatLng([lat, lon]);
       } else {
@@ -326,16 +309,14 @@ async function fetchVehicleData() {
           <small>${timeAgo}</small>
         `);
 
-        // Save marker in the map
         vehicleMarkers.set(fleet_number, marker);
 
-        // Store the last opened popup's fleet number when clicked
+        // Track popup state
         marker.on("popupopen", () => {
           lastOpenedFleetNumber = fleet_number;
           popupWasOpen = true;
         });
 
-        // Reset last opened fleet number when popup is closed
         marker.on("popupclose", () => {
           lastOpenedFleetNumber = null;
           popupWasOpen = false;
@@ -343,7 +324,7 @@ async function fetchVehicleData() {
       }
     });
 
-    // Only reopen the popup if it was open before the refresh
+    // Restore popup after refresh
     if (
       popupWasOpen &&
       lastOpenedFleetNumber &&
@@ -352,9 +333,10 @@ async function fetchVehicleData() {
       vehicleMarkers.get(lastOpenedFleetNumber).openPopup();
     }
   } catch (error) {
-    console.error("Error fetching vehicle data:", error);
+    console.error("Error fetching NEW LothianAPI vehicle data:", error);
   }
 }
+
 
 document
   .getElementById("requirementsCheckbox")
