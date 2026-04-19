@@ -103,7 +103,6 @@ const rReqIconFleetNumbers = new Set([
   "930",
   "934",
   "938",
-  "1146",
   "9005",
   "9201",
 ]);
@@ -119,6 +118,8 @@ const bothReqIconFleetNumbers = new Set([
   "193",
   "228",
   "286",
+  "298",
+  "299",
   "717",
   "738",
   "760",
@@ -137,8 +138,6 @@ const bothReqIconFleetNumbers = new Set([
   "795",
   "796",
   "797",
-  "1141",
-  "1148",
   "9001",
   "9002",
   "9006",
@@ -155,6 +154,7 @@ const bothReqIconFleetNumbers = new Set([
   "9205",
   "9206",
   "9207",
+  "9301"
 ]);
 
 // Function to create custom rectangle icons with fleet numbers
